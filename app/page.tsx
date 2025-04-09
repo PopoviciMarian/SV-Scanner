@@ -1,103 +1,155 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Shield, AlertTriangle, Moon, Sun } from "lucide-react"
+import CodeDiff from "@/components/code-diff"
+
+export default function SecurityCodeChecker() {
+  const [code, setCode] = useState("")
+  const [fixedCode, setFixedCode] = useState("")
+  const [vulnerabilities, setVulnerabilities] = useState<string[]>([])
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [hasResult, setHasResult] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const analyzeCode = async () => {
+    setIsAnalyzing(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to analyze code")
+      }
+
+      const result = await response.json()
+
+      setFixedCode(result.fixedCode)
+      setVulnerabilities(result.vulnerabilities)
+      setHasResult(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred")
+      console.error("Error analyzing code:", err)
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+ 
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="container mx-auto py-8 px-4">
+      
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Submit Your Code</CardTitle>
+          <CardDescription>
+            Paste your code below and we'll analyze it for common security vulnerabilities
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            placeholder="// Paste your code here..."
+            className="font-mono h-64 resize-none"
+            value={code}
+            //onChange={(e) => setCode(e.target.value)}
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            onChange={(e) => {
+              setCode(e.target.value)
+              if (hasResult) {
+                setHasResult(false)
+                setVulnerabilities([])
+                setFixedCode("")
+              }
+            }}
+          />
+        </CardContent>
+        <CardFooter>
+          <Button onClick={analyzeCode} disabled={!code.trim() || isAnalyzing} className="w-full bg-emerald-600 text-white">
+            {isAnalyzing ? "Analyzing..." : "Analyze Code"}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {hasResult && (
+        <div className="space-y-6" >
+          {vulnerabilities.length > 0 && (
+            <Alert variant="destructive" className="bg-red-200 text-red-800">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Vulnerabilities Detected</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-5 mt-2">
+                  {vulnerabilities.map((vuln, index) => (
+                    <li key={index}>{vuln}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {vulnerabilities.length === 0 && (
+            <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-300">
+              <Shield className="h-4 w-4" />
+              <AlertTitle>No Vulnerabilities Detected</AlertTitle>
+              <AlertDescription>Your code appears to be secure based on our analysis.</AlertDescription>
+            </Alert>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Code Diff</CardTitle>
+              <CardDescription>See the changes made to fix the detected vulnerabilities</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="diff">
+              <TabsList className="mb-4 bg-gray-100">
+                  <TabsTrigger
+                    value="diff"
+                    className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                  >
+                    Diff View
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="fixed"
+                    className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                  >
+                    Fixed Code
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="diff">
+                  <CodeDiff originalCode={code} newCode={fixedCode} />
+                </TabsContent>
+                <TabsContent value="fixed">
+                  <div className="bg-gray-50 dark:bg-gray-100 p-4 rounded-md overflow-auto">
+                    <pre className="font-mono text-sm whitespace-pre-wrap">{fixedCode}</pre>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+      )}
+    </main>
+  )
 }
